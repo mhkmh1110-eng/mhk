@@ -1,6 +1,7 @@
 """인터넷등기소(iros.go.kr) 등기부등본 자동 발급 모듈
 
-Selenium을 사용하여 인터넷등기소에서 등기부등본을 자동으로 발급/다운로드합니다.
+Selenium을 사용하여 인터넷등기소에서 등기부등본을 자동으로
+검색 → 결제 → 다운로드까지 전체 과정을 처리합니다.
 
 ※ 주의사항:
   - 인터넷등기소 로그인이 필요합니다 (공인인증서 또는 간편인증).
@@ -29,6 +30,7 @@ from selenium.common.exceptions import (
 from webdriver_manager.chrome import ChromeDriverManager
 
 import config
+from payment import PaymentHandler, InsufficientBalanceError
 
 logger = logging.getLogger(__name__)
 
@@ -40,6 +42,7 @@ class IrosAutomation:
         self.download_dir = os.path.abspath(download_dir or config.DOWNLOAD_DIR)
         self.headless = headless if headless is not None else config.HEADLESS
         self.driver = None
+        self.payment_handler = None
 
         # 다운로드 폴더 생성
         os.makedirs(self.download_dir, exist_ok=True)
@@ -75,6 +78,7 @@ class IrosAutomation:
         """브라우저를 시작하고 인터넷등기소에 접속한다."""
         logger.info("브라우저 시작 중...")
         self._create_driver()
+        self.payment_handler = PaymentHandler(self.driver)
         logger.info("인터넷등기소 접속 중...")
         self.driver.get(config.IROS_BASE_URL)
         time.sleep(3)
@@ -296,7 +300,7 @@ class IrosAutomation:
             issue_btn.click()
             time.sleep(2)
 
-            # 결제 확인 팝업 처리
+            # 결제 확인 팝업 처리 (결제 전 안내 팝업)
             try:
                 confirm_btn = WebDriverWait(self.driver, 5).until(
                     EC.element_to_be_clickable(
@@ -310,12 +314,26 @@ class IrosAutomation:
             except TimeoutException:
                 pass  # 확인 팝업이 없을 수 있음
 
-            logger.info("발급 요청 완료")
+            logger.info("발급 요청 완료 → 결제 진행")
             return True
 
         except (TimeoutException, NoSuchElementException) as e:
             logger.error(f"발급 요청 실패: {e}")
             return False
+
+    def process_payment(self):
+        """결제를 처리한다.
+
+        Returns:
+            bool: 결제 성공 여부
+
+        Raises:
+            InsufficientBalanceError: 선불전자지급수단 잔액 부족 시
+        """
+        if not self.payment_handler:
+            self.payment_handler = PaymentHandler(self.driver)
+
+        return self.payment_handler.process_payment()
 
     def download_pdf(self, property_id):
         """발급된 등기부등본 PDF를 다운로드하고 파일명을 변경한다.
@@ -397,13 +415,16 @@ class IrosAutomation:
         return None
 
     def process_single(self, property_id):
-        """단일 부동산고유번호에 대해 등기부등본을 발급한다.
+        """단일 부동산고유번호에 대해 등기부등본을 검색→결제→다운로드한다.
 
         Args:
             property_id: 부동산고유번호
 
         Returns:
             bool: 성공 여부
+
+        Raises:
+            InsufficientBalanceError: 잔액 부족으로 더 이상 진행 불가 시
         """
         logger.info(f"처리 시작: {property_id}")
 
@@ -420,16 +441,24 @@ class IrosAutomation:
                 # 3. 증명서 유형 선택
                 self.select_cert_type()
 
-                # 4. 발급 요청
+                # 4. 발급 요청 (결제 화면으로 이동)
                 if not self.request_issue():
                     continue
 
-                # 5. PDF 다운로드 및 파일명 변경
+                # 5. 결제 처리
+                if not self.process_payment():
+                    logger.error(f"결제 실패: {property_id}")
+                    continue
+
+                # 6. PDF 다운로드 및 파일명 변경
                 filepath = self.download_pdf(property_id)
                 if filepath:
                     logger.info(f"발급 성공: {property_id} → {filepath}")
                     return True
 
+            except InsufficientBalanceError:
+                # 잔액 부족은 상위로 전파 (전체 중단)
+                raise
             except WebDriverException as e:
                 logger.error(
                     f"시도 {attempt + 1}/{config.MAX_RETRIES + 1} 실패: {e}"

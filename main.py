@@ -1,15 +1,16 @@
 #!/usr/bin/env python3
-"""인터넷등기소 등기부등본 자동 발급 프로그램
+"""인터넷등기소 등기부등본 자동 발급 프로그램 (결제 포함)
 
 엑셀 파일에 있는 부동산고유번호 목록을 읽어
-인터넷등기소에서 등기부등본을 자동으로 발급/다운로드합니다.
+인터넷등기소에서 등기부등본을 자동으로 검색→결제→다운로드합니다.
 
 사용법:
-    python main.py                          # 기본 설정으로 실행
-    python main.py --excel input.xlsx       # 엑셀 파일 지정
-    python main.py --headless               # 백그라운드 실행
-    python main.py --mode view              # 열람 모드 (기본)
-    python main.py --mode issue             # 발급 모드
+    python main.py                                    # 기본 (현재유효사항 열람, 선불결제)
+    python main.py --excel input.xlsx                 # 엑셀 파일 지정
+    python main.py --payment prepaid                  # 선불전자지급수단 결제
+    python main.py --payment card                     # 신용카드 결제
+    python main.py --cert-type full --mode issue      # 전부사항 발급
+    python main.py --headless                         # 백그라운드 실행
 """
 
 import argparse
@@ -21,6 +22,7 @@ from datetime import datetime
 import config
 from excel_handler import load_property_ids, write_result
 from iros_automation import IrosAutomation
+from payment import InsufficientBalanceError
 
 
 def setup_logging():
@@ -71,6 +73,12 @@ def parse_args():
         help="전부사항(full) 또는 현재유효사항(current) (기본: full)",
     )
     parser.add_argument(
+        "--payment", "-p",
+        choices=["prepaid", "card", "transfer"],
+        default=config.PAYMENT_METHOD,
+        help="결제 방식: prepaid(선불전자지급수단), card(신용카드), transfer(계좌이체) (기본: prepaid)",
+    )
+    parser.add_argument(
         "--headless",
         action="store_true",
         default=config.HEADLESS,
@@ -93,19 +101,36 @@ def main():
     config.EXCEL_FILE_PATH = args.excel
     config.ISSUE_MODE = args.mode
     config.CERT_TYPE = args.cert_type
+    config.PAYMENT_METHOD = args.payment
     config.HEADLESS = args.headless
 
     # 다운로드 폴더 (오늘 날짜 하위 폴더)
     today = datetime.now().strftime("%Y%m%d")
     download_dir = os.path.join(args.output, today)
 
+    # 결제 방식 라벨
+    payment_labels = {
+        "prepaid": "선불전자지급수단 (충전잔액)",
+        "card": "신용카드",
+        "transfer": "계좌이체 (수동)",
+    }
+    cert_labels = {
+        "full": "전부사항",
+        "current": "현재유효사항",
+    }
+    mode_labels = {
+        "view": "열람 (700원/건)",
+        "issue": "발급 (1,000원/건)",
+    }
+
     logger.info("=" * 60)
     logger.info("인터넷등기소 등기부등본 자동 발급 프로그램")
     logger.info("=" * 60)
     logger.info(f"엑셀 파일    : {args.excel}")
     logger.info(f"다운로드 폴더: {download_dir}")
-    logger.info(f"모드         : {args.mode}")
-    logger.info(f"증명서 유형  : {args.cert_type}")
+    logger.info(f"모드         : {mode_labels.get(args.mode, args.mode)}")
+    logger.info(f"증명서 유형  : {cert_labels.get(args.cert_type, args.cert_type)}")
+    logger.info(f"결제 방식    : {payment_labels.get(args.payment, args.payment)}")
     logger.info(f"헤드리스     : {args.headless}")
     logger.info("=" * 60)
 
@@ -149,7 +174,21 @@ def main():
                 f"[{idx + 1}/{len(items)}] 처리 중: {display_pid}"
             )
 
-            success = automation.process_single(pid)
+            try:
+                success = automation.process_single(pid)
+            except InsufficientBalanceError as e:
+                logger.error(f"잔액 부족으로 중단: {e}")
+                write_result(row, "실패(잔액부족)", args.excel)
+                fail_count += 1
+                # 남은 항목도 실패 처리
+                for remaining in items[idx + 1:]:
+                    write_result(remaining["row"], "미처리(잔액부족)", args.excel)
+                    fail_count += 1
+                logger.error(
+                    "선불전자지급수단 잔액을 충전한 후 "
+                    f"--start-from {idx} 옵션으로 재실행하세요."
+                )
+                break
 
             if success:
                 write_result(row, "성공", args.excel)
