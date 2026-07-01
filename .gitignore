@@ -1,0 +1,15 @@
+# 생성 산출물 / 로그
+output/
+logs/
+downloads/
+
+# 파이썬
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+
+# OS/에디터
+.DS_Store
+*.swp
