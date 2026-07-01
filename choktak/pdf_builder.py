@@ -79,6 +79,13 @@ class _Sheet:
         else:
             self.text(x0 + pad, ty, s, size, font, "left")
 
+    def image(self, path, x, top, w, h):
+        """top-down 좌표로 이미지(투명 PNG 지원)를 그린다."""
+        self.c.drawImage(
+            path, x, self._y(top + h), width=w, height=h,
+            mask="auto", preserveAspectRatio=True, anchor="c",
+        )
+
     def vtext(self, x, top, s, size=9, font=None, gap=3):
         """세로쓰기(한 글자씩 아래로). '부동산의표시' 라벨용."""
         font = font or config.FONT_NAME_REGULAR
@@ -273,8 +280,12 @@ def build_page(sheet, ctx):
     # ── 11. 신청인 ──
     s.text(PAGE_W / 2, top, f"위 신청인   {config.CREDITOR_NAME}", size=9.5, font=R, align="center")
     top += 15
-    ceo = config.CREDITOR_CEO.replace("사장 ", "사장 ")
-    s.text(PAGE_W / 2 + 30, top, ceo, size=9.5, font=R, align="center")
+    ceo_top = top
+    s.text(PAGE_W / 2 + 30, top, config.CREDITOR_CEO, size=9.5, font=R, align="center")
+    # 직인(약인) 날인 — 사장 서명 오른쪽에 겹쳐 찍음
+    if config.SEAL_ENABLED and os.path.exists(config.SEAL_IMAGE):
+        s.image(config.SEAL_IMAGE, PAGE_W / 2 + 40,
+                ceo_top - 13, config.SEAL_WIDTH, config.SEAL_HEIGHT)
     top += 15
     s.text(PAGE_W / 2 + 30, top, f"(담당자 : {config.CREDITOR_CONTACT})", size=8.5, font=R, align="center")
     top += 26

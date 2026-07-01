@@ -50,6 +50,14 @@ CREDITOR_REG_NO = "110171-0029402"          # 등기용등록번호
 CREDITOR_ADDRESS = "부산광역시 남구 문현금융로40(문현동, 부산국제금융센터)"
 CREDITOR_CONTACT = "02-2638-1988"
 
+# ─── 직인(약인) 날인 ────────────────────────────────────────
+# 사장 서명 옆에 찍는 한국주택금융공사 직인 이미지(배경 투명 PNG)
+# 실제 운영 시 고해상도 공식 직인 PNG로 교체하면 됨.
+SEAL_IMAGE = os.environ.get("CHOKTAK_SEAL", os.path.join(DATA_DIR, "seal.png"))
+SEAL_ENABLED = os.environ.get("CHOKTAK_SEAL_ENABLED", "true").lower() == "true"
+SEAL_WIDTH = 66    # pt
+SEAL_HEIGHT = 40   # pt
+
 # ─── 고정 문구/금액 ────────────────────────────────────────
 REG_PURPOSE = "근저당권이전"                # 등기의 목적
 REG_CAUSE = "확정채권양도"                  # 등기원인
