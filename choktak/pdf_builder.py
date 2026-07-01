@@ -265,32 +265,41 @@ def build_page(sheet, ctx):
         s.text(LEFT + 8, ay + i * 13, line, size=8)
     for i, line in enumerate(config.ATTACHMENTS_RIGHT):
         s.text(LEFT + WIDTH / 2 + 8, ay + i * 13, line, size=8)
-    top += att_h + 6
+    top += att_h
 
-    # ── 9. 촉탁 문구 ──
-    s.text(PAGE_W / 2, top, config.COMMISSION_CLAUSE, size=9, font=R, align="center")
-    top += 20
-
-    # ── 10. 날짜 ──
-    s.text(PAGE_W / 2, top,
+    # ── 9. 촉탁 문구 ~ 신청인 (테두리 박스로 감쌈) ──
+    box_top = top
+    cur = box_top + 14
+    # 촉탁 문구
+    s.text(PAGE_W / 2, cur, config.COMMISSION_CLAUSE, size=9, font=R, align="center")
+    cur += 24
+    # 날짜
+    s.text(PAGE_W / 2, cur,
            f"{ctx['today_year']} 년    {ctx['today_month']:0>2} 월    {ctx['today_day']:0>2} 일",
            size=9.5, font=R, align="center")
-    top += 20
-
-    # ── 11. 신청인 ──
-    s.text(PAGE_W / 2, top, f"위 신청인   {config.CREDITOR_NAME}", size=9.5, font=R, align="center")
-    top += 15
-    ceo_top = top
-    s.text(PAGE_W / 2 + 30, top, config.CREDITOR_CEO, size=9.5, font=R, align="center")
-    # 직인(약인) 날인 — 사장 서명 오른쪽에 겹쳐 찍음
+    cur += 22
+    # 위 신청인
+    s.text(PAGE_W / 2, cur, f"위 신청인      {config.CREDITOR_NAME}", size=9.5, font=R, align="center")
+    cur += 20
+    # 사장 + 직인(약인) 날인 (겹치지 않게 이름 오른쪽에)
+    ceo_top = cur
+    ceo_cx = PAGE_W / 2 + 20
+    s.text(ceo_cx, cur, config.CREDITOR_CEO, size=9.5, font=R, align="center")
     if config.SEAL_ENABLED and os.path.exists(config.SEAL_IMAGE):
-        s.image(config.SEAL_IMAGE, PAGE_W / 2 + 40,
-                ceo_top - 13, config.SEAL_WIDTH, config.SEAL_HEIGHT)
-    top += 15
-    s.text(PAGE_W / 2 + 30, top, f"(담당자 : {config.CREDITOR_CONTACT})", size=8.5, font=R, align="center")
-    top += 26
+        sw, sh = config.SEAL_WIDTH, config.SEAL_HEIGHT
+        seal_left = ceo_cx + 55                    # 이름 오른쪽, 겹치지 않도록 간격
+        s.image(config.SEAL_IMAGE, seal_left,
+                ceo_top + 4.75 - sh / 2, sw, sh)   # 이름 줄 세로 중앙에 맞춤
+    cur += 20
+    # 담당자
+    s.text(ceo_cx, cur, f"(담당자 : {config.CREDITOR_CONTACT})", size=8.5, font=R, align="center")
+    cur += 16
+    # 박스 테두리 (첨부서면 아래에 이어 그림)
+    s.rect(LEFT, box_top, WIDTH, cur - box_top)
+    top = cur
 
-    # ── 12. 관할등기소 귀중 (ExtraBold) ──
+    # ── 10. 관할등기소 귀중 (박스 아래, ExtraBold) ──
+    top += 20
     s.text(PAGE_W / 2, top, f"{ctx['registry_office']} 귀중", size=13, font=XB, align="center")
 
 

@@ -45,7 +45,7 @@ FONT_NAME_EXTRABOLD = "NanumGothic-ExtraBold"
 # ─── 등기권리자 (고정값: 한국주택금융공사) ─────────────────
 # 한국주택금융공사법 제28조에 따른 촉탁신청 → 등기권리자는 항상 공사
 CREDITOR_NAME = "한국주택금융공사"
-CREDITOR_CEO = "사장 김경환"
+CREDITOR_CEO = "사장 김 경 환"
 CREDITOR_REG_NO = "110171-0029402"          # 등기용등록번호
 CREDITOR_ADDRESS = "부산광역시 남구 문현금융로40(문현동, 부산국제금융센터)"
 CREDITOR_CONTACT = "02-2638-1988"
@@ -55,8 +55,8 @@ CREDITOR_CONTACT = "02-2638-1988"
 # 실제 운영 시 고해상도 공식 직인 PNG로 교체하면 됨.
 SEAL_IMAGE = os.environ.get("CHOKTAK_SEAL", os.path.join(DATA_DIR, "seal.png"))
 SEAL_ENABLED = os.environ.get("CHOKTAK_SEAL_ENABLED", "true").lower() == "true"
-SEAL_WIDTH = 66    # pt
-SEAL_HEIGHT = 40   # pt
+SEAL_WIDTH = 62    # pt
+SEAL_HEIGHT = 38   # pt (preserveAspectRatio로 폭에 맞춰 축소됨)
 
 # ─── 고정 문구/금액 ────────────────────────────────────────
 REG_PURPOSE = "근저당권이전"                # 등기의 목적
